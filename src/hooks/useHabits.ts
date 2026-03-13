@@ -56,6 +56,7 @@ export function useHabits() {
       user_id: user.id,
       title: habit.title,
       frequency: habit.frequency ?? 1,
+      frequency_period: habit.frequency_period ?? 'week',
       category: habit.category ?? 'general',
       created_at: new Date().toISOString(),
     }

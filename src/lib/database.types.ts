@@ -15,6 +15,7 @@ export interface Database {
           user_id: string
           title: string
           frequency: number
+          frequency_period: string
           category: string
           created_at: string
         }
@@ -23,6 +24,7 @@ export interface Database {
           user_id: string
           title: string
           frequency?: number
+          frequency_period?: string
           category?: string
           created_at?: string
         }
@@ -31,6 +33,7 @@ export interface Database {
           user_id?: string
           title?: string
           frequency?: number
+          frequency_period?: string
           category?: string
           created_at?: string
         }

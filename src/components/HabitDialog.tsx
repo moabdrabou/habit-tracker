@@ -19,36 +19,40 @@ import {
 import type { Habit } from '@/lib/database.types'
 
 const CATEGORIES = [
-  'health',
-  'fitness',
-  'learning',
-  'productivity',
-  'mindfulness',
-  'social',
   'finance',
+  'fitness',
   'general',
+  'health',
+  'hobby',
+  'learning',
+  'mindfulness',
+  'productivity',
+  'social',
 ]
 
 interface HabitDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   habit?: Habit | null
-  onSave: (data: { title: string; frequency: number; category: string }) => void
+  onSave: (data: { title: string; frequency: number; frequency_period: string; category: string }) => void
 }
 
 export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogProps) {
   const [title, setTitle] = useState('')
   const [frequency, setFrequency] = useState('1')
+  const [frequencyPeriod, setFrequencyPeriod] = useState('week')
   const [category, setCategory] = useState('general')
 
   useEffect(() => {
     if (habit) {
       setTitle(habit.title)
       setFrequency(String(habit.frequency))
+      setFrequencyPeriod(habit.frequency_period ?? 'week')
       setCategory(habit.category)
     } else {
       setTitle('')
       setFrequency('1')
+      setFrequencyPeriod('week')
       setCategory('general')
     }
   }, [habit, open])
@@ -59,6 +63,7 @@ export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogPr
     onSave({
       title: title.trim(),
       frequency: parseInt(frequency, 10),
+      frequency_period: frequencyPeriod,
       category,
     })
     onOpenChange(false)
@@ -83,15 +88,32 @@ export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="frequency">Times per week</Label>
-            <Input
-              id="frequency"
-              type="number"
-              min="1"
-              max="7"
-              value={frequency}
-              onChange={e => setFrequency(e.target.value)}
-            />
+            <Label>Frequency</Label>
+            <div className="flex gap-2">
+              <Select value={frequency} onValueChange={setFrequency}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="flex items-center text-sm text-muted-foreground">times per</span>
+              <Select value={frequencyPeriod} onValueChange={setFrequencyPeriod}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="week">Week</SelectItem>
+                  <SelectItem value="month">Month</SelectItem>
+                  <SelectItem value="year">Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">

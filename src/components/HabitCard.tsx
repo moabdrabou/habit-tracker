@@ -12,6 +12,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   mindfulness: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400',
   social: 'bg-pink-500/15 text-pink-700 dark:text-pink-400',
   finance: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400',
+  hobby: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400',
   general: 'bg-gray-500/15 text-gray-700 dark:text-gray-400',
 }
 
@@ -54,7 +55,7 @@ export function HabitCard({ habit, completed, streak, onToggle, onEdit, onDelete
               <Trophy className="h-3 w-3 text-yellow-500" />
               Best: {streak.longest}d
             </span>
-            <span>{habit.frequency}x/week</span>
+            <span>{habit.frequency}x/{habit.frequency_period ?? 'week'}</span>
           </div>
         </div>
 
