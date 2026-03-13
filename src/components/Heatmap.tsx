@@ -34,7 +34,7 @@ const LEVEL_CLASSES = [
   'bg-emerald-700 dark:bg-emerald-300',
 ]
 
-const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function Heatmap({ data, maxCount }: HeatmapProps) {
   const max = maxCount ?? Math.max(...data.map(d => d.count), 1)
@@ -63,41 +63,43 @@ export function Heatmap({ data, maxCount }: HeatmapProps) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex gap-[3px] min-w-fit">
-        {/* Day labels */}
-        <div className="flex flex-col gap-[3px] pr-1">
-          {DAY_LABELS.map((label, i) => (
-            <div key={i} className="h-[13px] text-[10px] leading-[13px] text-muted-foreground">
-              {label}
+    <div>
+      <div className="overflow-x-auto pb-2">
+        <div className="flex gap-[3px] min-w-fit">
+          {/* Day labels */}
+          <div className="flex flex-col gap-[3px] pr-1">
+            {DAY_LABELS.map((label, i) => (
+              <div key={i} className="h-[13px] text-[10px] leading-[13px] text-muted-foreground">
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {/* Weeks */}
+          {weeks.map((week, wi) => (
+            <div key={wi} className="flex flex-col gap-[3px]">
+              {week.map((day, di) => {
+                if (day.count === -1) {
+                  return <div key={di} className="w-[13px] h-[13px]" />
+                }
+                const level = getLevel(day.count, max)
+                return (
+                  <Tooltip key={di}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`w-[13px] h-[13px] rounded-sm ${LEVEL_CLASSES[level]} transition-colors`}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-medium">{format(day.date, 'MMM d, yyyy')}</p>
+                      <p>{day.count} completion{day.count !== 1 ? 's' : ''}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              })}
             </div>
           ))}
         </div>
-
-        {/* Weeks */}
-        {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[3px]">
-            {week.map((day, di) => {
-              if (day.count === -1) {
-                return <div key={di} className="w-[13px] h-[13px]" />
-              }
-              const level = getLevel(day.count, max)
-              return (
-                <Tooltip key={di}>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={`w-[13px] h-[13px] rounded-sm ${LEVEL_CLASSES[level]} transition-colors`}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    <p className="font-medium">{format(day.date, 'MMM d, yyyy')}</p>
-                    <p>{day.count} completion{day.count !== 1 ? 's' : ''}</p>
-                  </TooltipContent>
-                </Tooltip>
-              )
-            })}
-          </div>
-        ))}
       </div>
 
       {/* Legend */}
