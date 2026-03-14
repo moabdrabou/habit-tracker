@@ -58,6 +58,7 @@ export function useHabits() {
       frequency: habit.frequency ?? 1,
       frequency_period: habit.frequency_period ?? 'week',
       category: habit.category ?? 'general',
+      times_per_day: habit.times_per_day ?? 1,
       created_at: new Date().toISOString(),
     }
     setHabits(prev => [...prev, optimistic])
@@ -105,54 +106,104 @@ export function useHabits() {
     }
   }
 
-  const toggleCompletion = async (habitId: string, date: Date) => {
+  const getCompletionCount = (habitId: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd')
+    return completions.filter(c => c.habit_id === habitId && c.completed_at === dateStr).length
+  }
+
+  const addCompletion = async (habitId: string, date: Date) => {
+    if (!user) return
+    const habit = habits.find(h => h.id === habitId)
+    if (!habit) return
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const currentCount = getCompletionCount(habitId, date)
+    if (currentCount >= habit.times_per_day) return
+
+    const tempId = crypto.randomUUID()
+    const optimistic: Completion = {
+      id: tempId,
+      habit_id: habitId,
+      user_id: user.id,
+      completed_at: dateStr,
+    }
+    setCompletions(prev => [...prev, optimistic])
+
+    const { data, error } = await supabase
+      .from('completions')
+      .insert({ habit_id: habitId, user_id: user.id, completed_at: dateStr })
+      .select()
+      .single()
+
+    if (error) {
+      setCompletions(prev => prev.filter(c => c.id !== tempId))
+    } else if (data) {
+      setCompletions(prev => prev.map(c => (c.id === tempId ? data : c)))
+    }
+  }
+
+  const removeCompletion = async (habitId: string, date: Date) => {
     if (!user) return
     const dateStr = format(date, 'yyyy-MM-dd')
-    const existing = completions.find(
+    const existing = completions.filter(
       c => c.habit_id === habitId && c.completed_at === dateStr
     )
+    if (existing.length === 0) return
 
-    if (existing) {
-      // Optimistic remove
-      setCompletions(prev => prev.filter(c => c.id !== existing.id))
-      const { error } = await supabase.from('completions').delete().eq('id', existing.id)
-      if (error) {
-        setCompletions(prev => [...prev, existing])
+    // Remove the last one added
+    const toRemove = existing[existing.length - 1]
+    setCompletions(prev => prev.filter(c => c.id !== toRemove.id))
+    const { error } = await supabase.from('completions').delete().eq('id', toRemove.id)
+    if (error) {
+      setCompletions(prev => [...prev, toRemove])
+    }
+  }
+
+  const toggleCompletion = async (habitId: string, date: Date) => {
+    if (!user) return
+    const habit = habits.find(h => h.id === habitId)
+    if (!habit) return
+
+    const currentCount = getCompletionCount(habitId, date)
+
+    if (currentCount >= habit.times_per_day) {
+      // Fully completed — remove all completions for this day
+      const dateStr = format(date, 'yyyy-MM-dd')
+      const existing = completions.filter(
+        c => c.habit_id === habitId && c.completed_at === dateStr
+      )
+      setCompletions(prev => prev.filter(c => !existing.some(e => e.id === c.id)))
+      for (const comp of existing) {
+        const { error } = await supabase.from('completions').delete().eq('id', comp.id)
+        if (error) {
+          setCompletions(prev => [...prev, comp])
+        }
       }
     } else {
-      // Optimistic add
-      const tempId = crypto.randomUUID()
-      const optimistic: Completion = {
-        id: tempId,
-        habit_id: habitId,
-        user_id: user.id,
-        completed_at: dateStr,
-      }
-      setCompletions(prev => [...prev, optimistic])
-
-      const { data, error } = await supabase
-        .from('completions')
-        .insert({ habit_id: habitId, user_id: user.id, completed_at: dateStr })
-        .select()
-        .single()
-
-      if (error) {
-        setCompletions(prev => prev.filter(c => c.id !== tempId))
-      } else if (data) {
-        setCompletions(prev => prev.map(c => (c.id === tempId ? data : c)))
-      }
+      // Add one more completion
+      await addCompletion(habitId, date)
     }
   }
 
   const isCompleted = (habitId: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    return completions.some(c => c.habit_id === habitId && c.completed_at === dateStr)
+    const habit = habits.find(h => h.id === habitId)
+    if (!habit) return false
+    return getCompletionCount(habitId, date) >= habit.times_per_day
   }
 
   const getStreak = (habitId: string) => {
-    const habitCompletions = completions
-      .filter(c => c.habit_id === habitId)
-      .map(c => startOfDay(new Date(c.completed_at + 'T00:00:00')))
+    const habit = habits.find(h => h.id === habitId)
+    const requiredCount = habit?.times_per_day ?? 1
+
+    // Count completions per date, only include dates where all iterations are done
+    const countByDate = new Map<string, number>()
+    for (const c of completions) {
+      if (c.habit_id !== habitId) continue
+      countByDate.set(c.completed_at, (countByDate.get(c.completed_at) ?? 0) + 1)
+    }
+
+    const habitCompletions = [...countByDate.entries()]
+      .filter(([, count]) => count >= requiredCount)
+      .map(([dateStr]) => startOfDay(new Date(dateStr + 'T00:00:00')))
       .sort((a, b) => b.getTime() - a.getTime())
 
     if (habitCompletions.length === 0) return { current: 0, longest: 0 }
@@ -224,6 +275,9 @@ export function useHabits() {
     updateHabit,
     deleteHabit,
     toggleCompletion,
+    addCompletion,
+    removeCompletion,
+    getCompletionCount,
     isCompleted,
     getStreak,
     getHeatmapData,

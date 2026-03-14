@@ -20,6 +20,9 @@ export function Dashboard() {
     updateHabit,
     deleteHabit,
     toggleCompletion,
+    addCompletion,
+    removeCompletion,
+    getCompletionCount,
     isCompleted,
     getStreak,
     getHeatmapData,
@@ -36,7 +39,7 @@ export function Dashboard() {
   const bestStreak = Math.max(0, ...habits.map(h => getStreak(h.id).longest))
   const heatmapData = getHeatmapData()
 
-  const handleSave = (data: { title: string; frequency: number; frequency_period: string; category: string }) => {
+  const handleSave = (data: { title: string; frequency: number; frequency_period: string; category: string; times_per_day: number }) => {
     if (editingHabit) {
       updateHabit(editingHabit.id, data)
     } else {
@@ -155,8 +158,11 @@ export function Dashboard() {
                   key={habit.id}
                   habit={habit}
                   completed={isCompleted(habit.id, today)}
+                  completionCount={getCompletionCount(habit.id, today)}
                   streak={getStreak(habit.id)}
                   onToggle={() => toggleCompletion(habit.id, today)}
+                  onIncrement={() => addCompletion(habit.id, today)}
+                  onDecrement={() => removeCompletion(habit.id, today)}
                   onEdit={() => handleEdit(habit)}
                   onDelete={() => deleteHabit(habit.id)}
                 />

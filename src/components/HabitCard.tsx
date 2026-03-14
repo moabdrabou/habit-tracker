@@ -1,7 +1,7 @@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Pencil, Trash2, Flame, Trophy } from 'lucide-react'
+import { Pencil, Trash2, Flame, Trophy, Minus, Plus } from 'lucide-react'
 import type { Habit } from '@/lib/database.types'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -19,23 +19,54 @@ const CATEGORY_COLORS: Record<string, string> = {
 interface HabitCardProps {
   habit: Habit
   completed: boolean
+  completionCount: number
   streak: { current: number; longest: number }
   onToggle: () => void
+  onIncrement: () => void
+  onDecrement: () => void
   onEdit: () => void
   onDelete: () => void
 }
 
-export function HabitCard({ habit, completed, streak, onToggle, onEdit, onDelete }: HabitCardProps) {
+export function HabitCard({ habit, completed, completionCount, streak, onToggle, onIncrement, onDecrement, onEdit, onDelete }: HabitCardProps) {
   const colorClass = CATEGORY_COLORS[habit.category] ?? CATEGORY_COLORS.general
+  const isMulti = habit.times_per_day > 1
+  const progress = Math.min(completionCount / habit.times_per_day, 1)
 
   return (
     <Card className={`p-4 transition-all ${completed ? 'opacity-75' : ''}`}>
       <div className="flex items-center gap-3">
-        <Checkbox
-          checked={completed}
-          onCheckedChange={onToggle}
-          className="h-5 w-5"
-        />
+        {isMulti ? (
+          <div className="relative flex items-center justify-center h-9 w-9 shrink-0">
+            <svg className="h-9 w-9 -rotate-90" viewBox="0 0 36 36">
+              <circle
+                cx="18" cy="18" r="15"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                className="text-muted/30"
+              />
+              <circle
+                cx="18" cy="18" r="15"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeDasharray={`${progress * 94.25} 94.25`}
+                strokeLinecap="round"
+                className={completed ? 'text-emerald-500' : 'text-primary'}
+              />
+            </svg>
+            <span className="absolute text-[10px] font-bold">
+              {completionCount}/{habit.times_per_day}
+            </span>
+          </div>
+        ) : (
+          <Checkbox
+            checked={completed}
+            onCheckedChange={onToggle}
+            className="h-5 w-5"
+          />
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -60,6 +91,28 @@ export function HabitCard({ habit, completed, streak, onToggle, onEdit, onDelete
         </div>
 
         <div className="flex items-center gap-1">
+          {isMulti && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onDecrement}
+                disabled={completionCount === 0}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onIncrement}
+                disabled={completed}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
             <Pencil className="h-4 w-4" />
           </Button>
