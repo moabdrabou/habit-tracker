@@ -39,7 +39,7 @@ export function Dashboard() {
   const bestStreak = Math.max(0, ...habits.map(h => getStreak(h.id).longest))
   const heatmapData = getHeatmapData()
 
-  const handleSave = (data: { title: string; frequency: number; frequency_period: string; category: string; times_per_day: number }) => {
+  const handleSave = (data: { title: string; frequency: number; frequency_period: string; category: string }) => {
     if (editingHabit) {
       updateHabit(editingHabit.id, data)
     } else {

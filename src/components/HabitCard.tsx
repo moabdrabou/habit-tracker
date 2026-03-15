@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Pencil, Trash2, Flame, Trophy, Minus, Plus } from 'lucide-react'
 import type { Habit } from '@/lib/database.types'
+import { getTimesPerDay } from '@/hooks/useHabits'
 
 const CATEGORY_COLORS: Record<string, string> = {
   health: 'bg-green-500/15 text-green-700 dark:text-green-400',
@@ -30,8 +31,8 @@ interface HabitCardProps {
 
 export function HabitCard({ habit, completed, completionCount, streak, onToggle, onIncrement, onDecrement, onEdit, onDelete }: HabitCardProps) {
   const colorClass = CATEGORY_COLORS[habit.category] ?? CATEGORY_COLORS.general
-  const isMulti = habit.times_per_day > 1
-  const progress = Math.min(completionCount / habit.times_per_day, 1)
+  const isMulti = getTimesPerDay(habit) > 1
+  const progress = Math.min(completionCount / getTimesPerDay(habit), 1)
 
   return (
     <Card className={`p-4 transition-all ${completed ? 'opacity-75' : ''}`}>
@@ -57,7 +58,7 @@ export function HabitCard({ habit, completed, completionCount, streak, onToggle,
               />
             </svg>
             <span className="absolute text-[10px] font-bold">
-              {completionCount}/{habit.times_per_day}
+              {completionCount}/{getTimesPerDay(habit)}
             </span>
           </div>
         ) : (

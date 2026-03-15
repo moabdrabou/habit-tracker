@@ -11,6 +11,10 @@ import {
   isSameDay,
 } from 'date-fns'
 
+export function getTimesPerDay(habit: Habit): number {
+  return habit.frequency_period === 'day' ? habit.frequency : 1
+}
+
 export function useHabits() {
   const { user } = useAuth()
   const [habits, setHabits] = useState<Habit[]>([])
@@ -58,7 +62,6 @@ export function useHabits() {
       frequency: habit.frequency ?? 1,
       frequency_period: habit.frequency_period ?? 'week',
       category: habit.category ?? 'general',
-      times_per_day: habit.times_per_day ?? 1,
       created_at: new Date().toISOString(),
     }
     setHabits(prev => [...prev, optimistic])
@@ -117,7 +120,7 @@ export function useHabits() {
     if (!habit) return
     const dateStr = format(date, 'yyyy-MM-dd')
     const currentCount = getCompletionCount(habitId, date)
-    if (currentCount >= habit.times_per_day) return
+    if (currentCount >= getTimesPerDay(habit)) return
 
     const tempId = crypto.randomUUID()
     const optimistic: Completion = {
@@ -165,7 +168,7 @@ export function useHabits() {
 
     const currentCount = getCompletionCount(habitId, date)
 
-    if (currentCount >= habit.times_per_day) {
+    if (currentCount >= getTimesPerDay(habit)) {
       // Fully completed — remove all completions for this day
       const dateStr = format(date, 'yyyy-MM-dd')
       const existing = completions.filter(
@@ -187,12 +190,12 @@ export function useHabits() {
   const isCompleted = (habitId: string, date: Date) => {
     const habit = habits.find(h => h.id === habitId)
     if (!habit) return false
-    return getCompletionCount(habitId, date) >= habit.times_per_day
+    return getCompletionCount(habitId, date) >= getTimesPerDay(habit)
   }
 
   const getStreak = (habitId: string) => {
     const habit = habits.find(h => h.id === habitId)
-    const requiredCount = habit?.times_per_day ?? 1
+    const requiredCount = habit ? getTimesPerDay(habit) : 1
 
     // Count completions per date, only include dates where all iterations are done
     const countByDate = new Map<string, number>()

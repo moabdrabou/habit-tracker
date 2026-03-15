@@ -34,7 +34,7 @@ interface HabitDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   habit?: Habit | null
-  onSave: (data: { title: string; frequency: number; frequency_period: string; category: string; times_per_day: number }) => void
+  onSave: (data: { title: string; frequency: number; frequency_period: string; category: string }) => void
 }
 
 export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogProps) {
@@ -42,7 +42,6 @@ export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogPr
   const [frequency, setFrequency] = useState('1')
   const [frequencyPeriod, setFrequencyPeriod] = useState('week')
   const [category, setCategory] = useState('general')
-  const [timesPerDay, setTimesPerDay] = useState('1')
 
   useEffect(() => {
     if (habit) {
@@ -50,13 +49,11 @@ export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogPr
       setFrequency(String(habit.frequency))
       setFrequencyPeriod(habit.frequency_period ?? 'week')
       setCategory(habit.category)
-      setTimesPerDay(String(habit.times_per_day ?? 1))
     } else {
       setTitle('')
       setFrequency('1')
       setFrequencyPeriod('week')
       setCategory('general')
-      setTimesPerDay('1')
     }
   }, [habit, open])
 
@@ -68,7 +65,6 @@ export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogPr
       frequency: parseInt(frequency, 10),
       frequency_period: frequencyPeriod,
       category,
-      times_per_day: parseInt(timesPerDay, 10),
     })
     onOpenChange(false)
   }
@@ -112,32 +108,12 @@ export function HabitDialog({ open, onOpenChange, habit, onSave }: HabitDialogPr
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="day">Day</SelectItem>
                   <SelectItem value="week">Week</SelectItem>
                   <SelectItem value="month">Month</SelectItem>
                   <SelectItem value="year">Year</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Times per Day</Label>
-            <div className="flex items-center gap-2">
-              <Select value={timesPerDay} onValueChange={setTimesPerDay}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-muted-foreground">
-                {parseInt(timesPerDay) === 1 ? 'time per day' : 'times per day'}
-              </span>
             </div>
           </div>
 
