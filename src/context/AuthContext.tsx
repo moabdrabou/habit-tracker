@@ -6,8 +6,10 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>
+  displayName: string | null
+  signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  updateDisplayName: (name: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
 }
 
@@ -36,8 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password })
+  const displayName = user?.user_metadata?.display_name as string | null ?? null
+
+  const signUp = async (email: string, password: string, name: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: name },
+      },
+    })
     return { error: error as Error | null }
   }
 
@@ -46,12 +56,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null }
   }
 
+  const updateDisplayName = async (name: string) => {
+    const { error, data } = await supabase.auth.updateUser({
+      data: { display_name: name },
+    })
+    if (!error && data.user) {
+      setUser(data.user)
+    }
+    return { error: error as Error | null }
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, displayName, signUp, signIn, updateDisplayName, signOut }}>
       {children}
     </AuthContext.Provider>
   )

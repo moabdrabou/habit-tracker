@@ -9,6 +9,7 @@ import { Target } from 'lucide-react'
 export function AuthPage() {
   const { signIn, signUp } = useAuth()
   const [isSignUp, setIsSignUp] = useState(false)
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -21,14 +22,23 @@ export function AuthPage() {
     setMessage('')
     setLoading(true)
 
-    const { error } = isSignUp
-      ? await signUp(email, password)
-      : await signIn(email, password)
-
-    if (error) {
-      setError(error.message)
-    } else if (isSignUp) {
-      setMessage('Check your email for the confirmation link!')
+    if (isSignUp) {
+      if (!displayName.trim()) {
+        setError('Display name is required')
+        setLoading(false)
+        return
+      }
+      const { error } = await signUp(email, password, displayName.trim())
+      if (error) {
+        setError(error.message)
+      } else {
+        setMessage('Check your email for the confirmation link!')
+      }
+    } else {
+      const { error } = await signIn(email, password)
+      if (error) {
+        setError(error.message)
+      }
     }
     setLoading(false)
   }
@@ -47,6 +57,19 @@ export function AuthPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input
+                  id="displayName"
+                  type="text"
+                  placeholder="Your name"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input

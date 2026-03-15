@@ -1,49 +1,89 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { useHabits } from '@/hooks/useHabits'
+import { useHabits, isScheduledForDay } from '@/hooks/useHabits'
 import { HabitCard } from './HabitCard'
 import { HabitDialog } from './HabitDialog'
 import { Heatmap } from './Heatmap'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Plus, LogOut, Target, Flame, Trophy, CalendarDays } from 'lucide-react'
+import { Plus, LogOut, Target, Flame, Trophy, CalendarDays, BarChart3 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Habit } from '@/lib/database.types'
+import {
+  requestNotificationPermission,
+  startReminderChecker,
+  stopReminderChecker,
+} from '@/lib/notifications'
 
-export function Dashboard() {
-  const { user, signOut } = useAuth()
+interface DashboardProps {
+  onNavigateStats: () => void
+}
+
+export function Dashboard({ onNavigateStats }: DashboardProps) {
+  const { displayName, signOut } = useAuth()
   const {
     habits,
     loading,
     addHabit,
     updateHabit,
     deleteHabit,
+    resetCompletions,
     toggleCompletion,
-    addCompletion,
-    removeCompletion,
     getCompletionCount,
     isCompleted,
     getStreak,
     getHeatmapData,
+    getFreezesRemaining,
+    addFreeze,
+    isDayFrozen,
+    maxActiveHabits,
   } = useHabits()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null)
+  const [addError, setAddError] = useState<string | null>(null)
 
   const today = new Date()
-  const todayCompleted = habits.filter(h => isCompleted(h.id, today)).length
-  const todayProgress = habits.length > 0 ? (todayCompleted / habits.length) * 100 : 0
+  const todayStr = format(today, 'yyyy-MM-dd')
+
+  // Only count scheduled habits for today's progress
+  const scheduledToday = habits.filter(h => isScheduledForDay(h, today))
+  const todayCompleted = scheduledToday.filter(h => isCompleted(h.id, today)).length
+  const todayProgress = scheduledToday.length > 0 ? (todayCompleted / scheduledToday.length) * 100 : 0
 
   const totalCurrentStreak = habits.reduce((sum, h) => sum + getStreak(h.id).current, 0)
   const bestStreak = Math.max(0, ...habits.map(h => getStreak(h.id).longest))
   const heatmapData = getHeatmapData()
 
-  const handleSave = (data: { title: string; frequency: number; frequency_period: string; category: string }) => {
-    if (editingHabit) {
-      updateHabit(editingHabit.id, data)
-    } else {
-      addHabit(data)
+  // Start reminder checker
+  useEffect(() => {
+    const habitsWithReminders = habits.filter(h => h.reminder_time)
+    if (habitsWithReminders.length > 0) {
+      requestNotificationPermission()
+      startReminderChecker(habits, isCompleted)
+    }
+    return () => stopReminderChecker()
+  }, [habits, isCompleted])
+
+  const handleSave = async (data: {
+    title: string
+    frequency: number
+    frequency_period: string
+    category: string
+    habit_type: string
+    scheduled_days: number[] | null
+    reminder_time: string | null
+  }) => {
+    setAddError(null)
+    try {
+      if (editingHabit) {
+        await updateHabit(editingHabit.id, data)
+      } else {
+        await addHabit(data)
+      }
+    } catch (err) {
+      if (err instanceof Error) setAddError(err.message)
     }
     setEditingHabit(null)
   }
@@ -54,6 +94,7 @@ export function Dashboard() {
   }
 
   const handleNew = () => {
+    setAddError(null)
     setEditingHabit(null)
     setDialogOpen(true)
   }
@@ -66,6 +107,8 @@ export function Dashboard() {
     )
   }
 
+  const emptySlots = Math.max(0, maxActiveHabits - habits.length)
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -76,8 +119,11 @@ export function Dashboard() {
             <h1 className="text-xl font-bold">Habit Tracker</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={onNavigateStats} title="Stats">
+              <BarChart3 className="h-4 w-4" />
+            </Button>
             <span className="text-sm text-muted-foreground hidden sm:inline">
-              {user?.email}
+              {displayName}
             </span>
             <Button variant="ghost" size="icon" onClick={signOut}>
               <LogOut className="h-4 w-4" />
@@ -94,7 +140,7 @@ export function Dashboard() {
               <CalendarDays className="h-4 w-4" />
               Today
             </div>
-            <p className="text-2xl font-bold">{todayCompleted}/{habits.length}</p>
+            <p className="text-2xl font-bold">{todayCompleted}/{scheduledToday.length}</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
@@ -129,47 +175,70 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Today's habits */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
+        {/* Slots counter */}
+        <div className="flex items-center justify-between">
+          <div>
             <h2 className="text-lg font-semibold">
               Today — {format(today, 'EEEE, MMMM d')}
             </h2>
-            <Button onClick={handleNew} size="sm">
+            <p className="text-xs text-muted-foreground">
+              {habits.length}/{maxActiveHabits} slots used
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleNew} size="sm" disabled={habits.length >= maxActiveHabits}>
               <Plus className="h-4 w-4 mr-1" />
               Add Habit
             </Button>
           </div>
-
-          {habits.length === 0 ? (
-            <Card className="p-8 text-center text-muted-foreground">
-              <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No habits yet</p>
-              <p className="text-sm mt-1">Create your first habit to start tracking</p>
-              <Button onClick={handleNew} className="mt-4">
-                <Plus className="h-4 w-4 mr-1" />
-                Create Habit
-              </Button>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {habits.map(habit => (
-                <HabitCard
-                  key={habit.id}
-                  habit={habit}
-                  completed={isCompleted(habit.id, today)}
-                  completionCount={getCompletionCount(habit.id, today)}
-                  streak={getStreak(habit.id)}
-                  onToggle={() => toggleCompletion(habit.id, today)}
-                  onIncrement={() => addCompletion(habit.id, today)}
-                  onDecrement={() => removeCompletion(habit.id, today)}
-                  onEdit={() => handleEdit(habit)}
-                  onDelete={() => deleteHabit(habit.id)}
-                />
-              ))}
-            </div>
-          )}
         </div>
+
+        {addError && (
+          <p className="text-sm text-destructive">{addError}</p>
+        )}
+
+        {/* Habit grid with slots */}
+        {habits.length === 0 && !showArchived ? (
+          <Card className="p-8 text-center text-muted-foreground">
+            <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p className="text-lg font-medium">No habits yet</p>
+            <p className="text-sm mt-1">Create your first habit to start tracking</p>
+            <Button onClick={handleNew} className="mt-4">
+              <Plus className="h-4 w-4 mr-1" />
+              Create Habit
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {habits.map(habit => (
+              <HabitCard
+                key={habit.id}
+                habit={habit}
+                completed={isCompleted(habit.id, today)}
+                completionCount={getCompletionCount(habit.id, today)}
+                streak={getStreak(habit.id)}
+                freezesRemaining={getFreezesRemaining(habit.id)}
+                isFrozenToday={isDayFrozen(habit.id, todayStr)}
+                onToggle={() => toggleCompletion(habit.id, today)}
+                onEdit={() => handleEdit(habit)}
+                onDelete={() => deleteHabit(habit.id)}
+                onReset={() => resetCompletions(habit.id, today)}
+                onFreeze={() => addFreeze(habit.id)}
+              />
+            ))}
+            {/* Empty slots */}
+            {Array.from({ length: emptySlots }).map((_, i) => (
+              <button
+                key={`empty-${i}`}
+                onClick={handleNew}
+                className="border-2 border-dashed border-muted rounded-xl p-4 min-h-[80px] flex items-center justify-center text-muted-foreground hover:border-primary/30 hover:text-primary/50 transition-colors cursor-pointer"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+            ))}
+          </div>
+        )}
+
       </main>
 
       <HabitDialog
