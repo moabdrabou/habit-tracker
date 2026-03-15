@@ -1,9 +1,9 @@
-import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Pencil, Trash2, Flame, Trophy, Minus, Plus } from 'lucide-react'
+import { StreakRing } from '@/components/StreakRing'
+import { Pencil, Trash2, Flame, Trophy, RotateCcw, ShieldCheck, ShieldX, Snowflake } from 'lucide-react'
 import type { Habit } from '@/lib/database.types'
-import { getTimesPerDay } from '@/hooks/useHabits'
+import { getTimesPerDay, isScheduledForDay } from '@/hooks/useHabits'
 
 const CATEGORY_COLORS: Record<string, string> = {
   health: 'bg-green-500/15 text-green-700 dark:text-green-400',
@@ -22,61 +22,97 @@ interface HabitCardProps {
   completed: boolean
   completionCount: number
   streak: { current: number; longest: number }
+  freezesRemaining: number
+  isFrozenToday: boolean
   onToggle: () => void
-  onIncrement: () => void
-  onDecrement: () => void
   onEdit: () => void
   onDelete: () => void
+  onReset: () => void
+  onFreeze: () => void
 }
 
-export function HabitCard({ habit, completed, completionCount, streak, onToggle, onIncrement, onDecrement, onEdit, onDelete }: HabitCardProps) {
+export function HabitCard({
+  habit,
+  completed,
+  completionCount,
+  streak,
+  freezesRemaining,
+  isFrozenToday,
+  onToggle,
+  onEdit,
+  onDelete,
+  onReset,
+  onFreeze,
+}: HabitCardProps) {
   const colorClass = CATEGORY_COLORS[habit.category] ?? CATEGORY_COLORS.general
-  const isMulti = getTimesPerDay(habit) > 1
-  const progress = Math.min(completionCount / getTimesPerDay(habit), 1)
+  const isAvoid = habit.habit_type === 'avoid'
+  const isMulti = !isAvoid && getTimesPerDay(habit) > 1
+  const timesPerDay = getTimesPerDay(habit)
+  const progress = isAvoid
+    ? (completed ? 1 : 0)
+    : Math.min(completionCount / timesPerDay, 1)
+  const scheduledToday = isScheduledForDay(habit, new Date())
+
+  // Determine streak ring status
+  const getStatus = (): 'on-track' | 'at-risk' | 'broken' => {
+    if (isFrozenToday) return 'on-track'
+    if (completed) return 'on-track'
+    if (streak.current > 0) return 'at-risk'
+    return 'broken'
+  }
+
+  // For avoid habits: failed means they have completions (broke the habit)
+  const avoidFailed = isAvoid && completionCount > 0
 
   return (
-    <Card className={`p-4 transition-all ${completed ? 'opacity-75' : ''}`}>
+    <Card className={`p-4 transition-all ${
+      !scheduledToday ? 'opacity-50' : ''
+    } ${isFrozenToday ? 'border-blue-500/30' : ''}`}>
       <div className="flex items-center gap-3">
-        {isMulti ? (
-          <div className="relative flex items-center justify-center h-9 w-9 shrink-0">
-            <svg className="h-9 w-9 -rotate-90" viewBox="0 0 36 36">
-              <circle
-                cx="18" cy="18" r="15"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                className="text-muted/30"
-              />
-              <circle
-                cx="18" cy="18" r="15"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeDasharray={`${progress * 94.25} 94.25`}
-                strokeLinecap="round"
-                className={completed ? 'text-emerald-500' : 'text-primary'}
-              />
-            </svg>
-            <span className="absolute text-[10px] font-bold">
-              {completionCount}/{getTimesPerDay(habit)}
-            </span>
+        {/* Streak Ring replaces checkbox/progress circle */}
+        {isAvoid ? (
+          <div className="relative">
+            <StreakRing
+              progress={completed ? 1 : 0}
+              streakDays={streak.current}
+              size={40}
+              status={getStatus()}
+              onClick={onToggle}
+              label={avoidFailed ? '!' : undefined}
+            />
+            {avoidFailed ? (
+              <ShieldX className="absolute -bottom-1 -right-1 h-4 w-4 text-red-500" />
+            ) : (
+              <ShieldCheck className="absolute -bottom-1 -right-1 h-4 w-4 text-emerald-500" />
+            )}
           </div>
         ) : (
-          <Checkbox
-            checked={completed}
-            onCheckedChange={onToggle}
-            className="h-5 w-5"
+          <StreakRing
+            progress={progress}
+            streakDays={isMulti ? completionCount : streak.current}
+            size={40}
+            status={getStatus()}
+            onClick={onToggle}
+            label={isMulti ? `${completionCount}/${timesPerDay}` : undefined}
           />
         )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`font-medium ${completed ? 'line-through text-muted-foreground' : ''}`}>
+            <span className={`font-medium ${completed && !isAvoid ? 'line-through text-muted-foreground' : ''} ${avoidFailed ? 'text-red-500' : ''}`}>
               {habit.title}
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${colorClass}`}>
               {habit.category}
             </span>
+            {isAvoid && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${avoidFailed ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-500'}`}>
+                {avoidFailed ? 'Failed' : 'Avoided'}
+              </span>
+            )}
+            {isFrozenToday && (
+              <Snowflake className="h-3.5 w-3.5 text-blue-400" />
+            )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -87,36 +123,38 @@ export function HabitCard({ habit, completed, completionCount, streak, onToggle,
               <Trophy className="h-3 w-3 text-yellow-500" />
               Best: {streak.longest}d
             </span>
-            <span>{habit.frequency}x/{habit.frequency_period ?? 'week'}</span>
+            {!isAvoid && (
+              <span>{habit.frequency}x/{habit.frequency_period ?? 'week'}</span>
+            )}
+            {habit.scheduled_days && habit.scheduled_days.length > 0 && habit.scheduled_days.length < 7 && (
+              <span className="text-muted-foreground/70">
+                {habit.scheduled_days.map(d => ['S','M','T','W','T','F','S'][d]).join('')}
+              </span>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-1">
-          {isMulti && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onDecrement}
-                disabled={completionCount === 0}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onIncrement}
-                disabled={completed}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </>
+          {/* Freeze button */}
+          {!completed && !isFrozenToday && freezesRemaining > 0 && scheduledToday && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-blue-400 hover:text-blue-300"
+              onClick={onFreeze}
+              title={`Freeze streak (${freezesRemaining}/2 left this month)`}
+            >
+              <Snowflake className="h-4 w-4" />
+            </Button>
           )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
             <Pencil className="h-4 w-4" />
           </Button>
+          {completionCount > 0 && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={onReset} title="Reset today's completions">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
