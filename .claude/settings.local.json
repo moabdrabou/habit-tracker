@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(shopt:*)",
-      "Bash(cp:*)",
-      "Bash(find:*)"
-    ]
-  }
-}

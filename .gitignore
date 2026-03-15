@@ -25,3 +25,4 @@ dist-ssr
 .issues/*
 supabase/migrations/
 .env
+.claude/
